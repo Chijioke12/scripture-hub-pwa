@@ -1,0 +1,786 @@
+<!DOCTYPE html><html lang="en"><head><meta name="x-poe-datastore-behavior" content="local_only">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scripture Reader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        'bg-light': '#FFFFFF',
+                        'bg-dark': '#181818'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .verse-container {
+            margin-bottom: 1rem;
+            padding: 0.5rem 0;
+        }
+        
+        .verse-number {
+            display: inline-block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #5D5CDE;
+            background-color: rgba(93, 92, 222, 0.1);
+            border-radius: 0.375rem;
+            padding: 0.125rem 0.5rem;
+            margin-right: 0.75rem;
+            margin-bottom: 0.25rem;
+            min-width: 1.5rem;
+            text-align: center;
+            border: 1px solid rgba(93, 92, 222, 0.2);
+        }
+        
+        .dark .verse-number {
+            background-color: rgba(93, 92, 222, 0.2);
+            border-color: rgba(93, 92, 222, 0.3);
+        }
+        
+        .verse-text {
+            line-height: 1.8;
+            font-size: 1.1rem;
+            display: inline;
+        }
+        
+        .chapter-content {
+            line-height: 1.8;
+            font-size: 1.1rem;
+        }
+        
+        .loading-shimmer {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        
+        .dark .loading-shimmer {
+            background: linear-gradient(90deg, #2d2d2d 25%, #3d3d3d 50%, #2d2d2d 75%);
+            background-size: 200% 100%;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
+        .verse-highlight {
+            background-color: rgba(93, 92, 222, 0.1);
+            border-left: 3px solid #5D5CDE;
+            padding-left: 0.5rem;
+            margin-left: -0.5rem;
+            border-radius: 0.25rem;
+        }
+        
+        .navigation-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #9CA3AF transparent;
+        }
+        
+        .navigation-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .navigation-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .navigation-scroll::-webkit-scrollbar-thumb {
+            background-color: #9CA3AF;
+            border-radius: 3px;
+        }
+
+        .verse-container:hover {
+            background-color: rgba(93, 92, 222, 0.05);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            margin: 0.25rem -0.25rem;
+            transition: all 0.2s ease;
+        }
+
+        .dark .verse-container:hover {
+            background-color: rgba(93, 92, 222, 0.1);
+        }
+    </style>
+<script src="https://puc.poecdn.net/authenticated_preview_page/syncedState.3f7572448765332f3047.js"></script><!-- PWA Links Injected by PWA Forge -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#1E88E5" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" href="icons/icon-512x512.png" />
+  </head>
+<body class="bg-bg-light dark:bg-bg-dark text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
+    <!-- Navigation Header -->
+    <header class="bg-white dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-xl font-bold text-primary">Scripture Reader</h1>
+                    <button id="menuToggle" class="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+                
+                <div class="hidden md:flex items-center space-x-4">
+                    <select id="bibleVersion" class="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="">Loading versions...</option>
+                    </select>
+                    
+                    <div class="flex items-center space-x-2">
+                        <select id="bookSelect" class="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary min-w-[120px]">
+                            <option value="">Select Book</option>
+                        </select>
+                        
+                        <select id="chapterSelect" class="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary min-w-[80px]">
+                            <option value="">Ch.</option>
+                        </select>
+                    </div>
+                    
+                    <button id="searchToggle" class="p-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mobile Menu -->
+    <div id="mobileMenu" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 w-80 h-full shadow-lg">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold">Navigation</h3>
+                    <button id="closeMobileMenu" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Bible Version</label>
+                    <select id="mobileBibleVersion" class="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="">Loading versions...</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Book</label>
+                    <select id="mobileBookSelect" class="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="">Select Book</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Chapter</label>
+                    <select id="mobileChapterSelect" class="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="">Select Chapter</option>
+                    </select>
+                </div>
+                
+                <button id="mobileSearchToggle" class="w-full p-3 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors">
+                    <i class="fas fa-search mr-2"></i>Search Scripture
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Modal -->
+    <div id="searchModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold">Search Scripture</h3>
+                        <button id="closeSearch" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="flex space-x-2">
+                        <input id="searchInput" type="text" placeholder="Enter search terms..." class="flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary">
+                        <button id="searchButton" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="searchResults" class="flex-1 overflow-y-auto p-6"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <!-- Sidebar Navigation -->
+            <aside class="lg:col-span-1 hidden lg:block">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4 sticky top-24">
+                    <h3 class="text-lg font-semibold mb-4">Quick Navigation</h3>
+                    <div id="bookNavigation" class="navigation-scroll space-y-2 max-h-96 overflow-y-auto">
+                        <!-- Book navigation will be populated here -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Reading Area -->
+            <section class="lg:col-span-3">
+                <!-- Chapter Header -->
+                <div id="chapterHeader" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6 hidden">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+                        <div>
+                            <h2 id="chapterTitle" class="text-2xl font-bold text-primary"></h2>
+                            <p id="chapterInfo" class="text-gray-600 dark:text-gray-400"></p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button id="prevChapter" class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-chevron-left mr-2"></i>Previous
+                            </button>
+                            <button id="nextChapter" class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                Next<i class="fas fa-chevron-right ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chapter Content -->
+                <div id="chapterContent" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+                    <div id="welcomeMessage" class="text-center py-12">
+                        <i class="fas fa-book-open text-6xl text-primary mb-4"></i>
+                        <h2 class="text-2xl font-bold mb-2">Welcome to Scripture Reader</h2>
+                        <p class="text-gray-600 dark:text-gray-400 mb-6">Select a Bible version and book to start reading</p>
+                        <div id="loadingInitial" class="hidden">
+                            <i class="fas fa-spinner fa-spin text-primary text-2xl"></i>
+                            <p class="mt-2 text-gray-600 dark:text-gray-400">Loading Bible versions...</p>
+                        </div>
+                    </div>
+                    
+                    <div id="loadingContent" class="hidden space-y-4">
+                        <div class="loading-shimmer h-4 rounded"></div>
+                        <div class="loading-shimmer h-4 rounded w-3/4"></div>
+                        <div class="loading-shimmer h-4 rounded w-5/6"></div>
+                        <div class="loading-shimmer h-4 rounded w-2/3"></div>
+                        <div class="loading-shimmer h-4 rounded"></div>
+                        <div class="loading-shimmer h-4 rounded w-4/5"></div>
+                    </div>
+                    
+                    <div id="chapterText" class="chapter-content hidden"></div>
+                    
+                    <div id="errorMessage" class="hidden text-center py-8">
+                        <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+                        <h3 class="text-xl font-semibold mb-2">Error Loading Content</h3>
+                        <p id="errorText" class="text-gray-600 dark:text-gray-400 mb-4"></p>
+                        <button id="retryButton" class="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                            <i class="fas fa-redo mr-2"></i>Retry
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        // Dark mode setup
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        class BibleApp {
+            constructor() {
+                // You would replace this with your actual backend URL
+                this.apiBaseUrl = 'https://bible-ivory.vercel.app/api/proxy';
+                this.currentBible = null;
+                this.currentBook = null;
+                this.currentChapter = null;
+                this.bibles = [];
+                this.books = [];
+                this.chapters = [];
+                
+                this.initializeElements();
+                this.setupEventListeners();
+                this.loadBibleVersions();
+            }
+
+            initializeElements() {
+                // Navigation elements
+                this.bibleVersionSelect = document.getElementById('bibleVersion');
+                this.mobileBibleVersionSelect = document.getElementById('mobileBibleVersion');
+                this.bookSelect = document.getElementById('bookSelect');
+                this.mobileBookSelect = document.getElementById('mobileBookSelect');
+                this.chapterSelect = document.getElementById('chapterSelect');
+                this.mobileChapterSelect = document.getElementById('mobileChapterSelect');
+                
+                // Content elements
+                this.chapterHeader = document.getElementById('chapterHeader');
+                this.chapterTitle = document.getElementById('chapterTitle');
+                this.chapterInfo = document.getElementById('chapterInfo');
+                this.chapterText = document.getElementById('chapterText');
+                this.loadingContent = document.getElementById('loadingContent');
+                this.welcomeMessage = document.getElementById('welcomeMessage');
+                this.loadingInitial = document.getElementById('loadingInitial');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.errorText = document.getElementById('errorText');
+                
+                // Navigation elements
+                this.prevChapterBtn = document.getElementById('prevChapter');
+                this.nextChapterBtn = document.getElementById('nextChapter');
+                this.bookNavigation = document.getElementById('bookNavigation');
+                
+                // Modal elements
+                this.searchModal = document.getElementById('searchModal');
+                this.searchInput = document.getElementById('searchInput');
+                this.searchResults = document.getElementById('searchResults');
+                this.mobileMenu = document.getElementById('mobileMenu');
+            }
+
+            setupEventListeners() {
+                // Version selection
+                this.bibleVersionSelect.addEventListener('change', (e) => {
+                    this.selectBibleVersion(e.target.value);
+                    this.mobileBibleVersionSelect.value = e.target.value;
+                });
+                
+                this.mobileBibleVersionSelect.addEventListener('change', (e) => {
+                    this.selectBibleVersion(e.target.value);
+                    this.bibleVersionSelect.value = e.target.value;
+                });
+
+                // Book selection
+                this.bookSelect.addEventListener('change', (e) => {
+                    this.selectBook(e.target.value);
+                    this.mobileBookSelect.value = e.target.value;
+                });
+                
+                this.mobileBookSelect.addEventListener('change', (e) => {
+                    this.selectBook(e.target.value);
+                    this.bookSelect.value = e.target.value;
+                });
+
+                // Chapter selection
+                this.chapterSelect.addEventListener('change', (e) => {
+                    this.selectChapter(e.target.value);
+                    this.mobileChapterSelect.value = e.target.value;
+                });
+                
+                this.mobileChapterSelect.addEventListener('change', (e) => {
+                    this.selectChapter(e.target.value);
+                    this.chapterSelect.value = e.target.value;
+                });
+
+                // Navigation buttons
+                this.prevChapterBtn.addEventListener('click', () => this.navigateChapter(-1));
+                this.nextChapterBtn.addEventListener('click', () => this.navigateChapter(1));
+
+                // Search functionality
+                document.getElementById('searchToggle').addEventListener('click', () => {
+                    this.searchModal.classList.remove('hidden');
+                    this.searchInput.focus();
+                });
+                
+                document.getElementById('mobileSearchToggle').addEventListener('click', () => {
+                    this.mobileMenu.classList.add('hidden');
+                    this.searchModal.classList.remove('hidden');
+                    this.searchInput.focus();
+                });
+                
+                document.getElementById('closeSearch').addEventListener('click', () => {
+                    this.searchModal.classList.add('hidden');
+                });
+                
+                document.getElementById('searchButton').addEventListener('click', () => {
+                    this.performSearch();
+                });
+                
+                this.searchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.performSearch();
+                    }
+                });
+
+                // Mobile menu
+                document.getElementById('menuToggle').addEventListener('click', () => {
+                    this.mobileMenu.classList.remove('hidden');
+                });
+                
+                document.getElementById('closeMobileMenu').addEventListener('click', () => {
+                    this.mobileMenu.classList.add('hidden');
+                });
+                
+                // Close mobile menu when clicking outside
+                this.mobileMenu.addEventListener('click', (e) => {
+                    if (e.target === this.mobileMenu) {
+                        this.mobileMenu.classList.add('hidden');
+                    }
+                });
+                
+                // Close search modal when clicking outside
+                this.searchModal.addEventListener('click', (e) => {
+                    if (e.target === this.searchModal) {
+                        this.searchModal.classList.add('hidden');
+                    }
+                });
+
+                // Retry button
+                document.getElementById('retryButton').addEventListener('click', () => {
+                    if (this.currentBook && this.currentChapter) {
+                        this.loadChapter(this.currentBook, this.currentChapter);
+                    }
+                });
+            }
+
+            async apiCall(path) {
+                try {
+                    const url = `${this.apiBaseUrl}?path=${encodeURIComponent(path)}`;
+                    const response = await fetch(url);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    return await response.json();
+                } catch (error) {
+                    console.error('API call failed:', error);
+                    throw error;
+                }
+            }
+
+            async loadBibleVersions() {
+                this.loadingInitial.classList.remove('hidden');
+                
+                try {
+                    const response = await this.apiCall('bibles');
+                    this.bibles = response.data || [];
+                    
+                    this.populateBibleVersions();
+                    
+                    // Auto-select first Bible if available
+                    if (this.bibles.length > 0) {
+                        this.selectBibleVersion(this.bibles[0].id);
+                    }
+                } catch (error) {
+                    this.showError('Failed to load Bible versions. Please check your internet connection and try again.');
+                } finally {
+                    this.loadingInitial.classList.add('hidden');
+                }
+            }
+
+            populateBibleVersions() {
+                const options = this.bibles.map(bible => 
+                    `<option value="${bible.id}">${bible.name}</option>`
+                ).join('');
+                
+                this.bibleVersionSelect.innerHTML = '<option value="">Select Bible Version</option>' + options;
+                this.mobileBibleVersionSelect.innerHTML = '<option value="">Select Bible Version</option>' + options;
+            }
+
+            async selectBibleVersion(bibleId) {
+                if (!bibleId || bibleId === this.currentBible) return;
+                
+                this.currentBible = bibleId;
+                this.currentBook = null;
+                this.currentChapter = null;
+                
+                this.bookSelect.innerHTML = '<option value="">Loading books...</option>';
+                this.mobileBookSelect.innerHTML = '<option value="">Loading books...</option>';
+                this.chapterSelect.innerHTML = '<option value="">Ch.</option>';
+                this.mobileChapterSelect.innerHTML = '<option value="">Select Chapter</option>';
+                
+                try {
+                    const response = await this.apiCall(`bibles/${bibleId}/books`);
+                    this.books = response.data || [];
+                    
+                    this.populateBooks();
+                    this.populateBookNavigation();
+                } catch (error) {
+                    this.showError('Failed to load books. Please try again.');
+                }
+            }
+
+            populateBooks() {
+                const options = this.books.map(book => 
+                    `<option value="${book.id}">${book.name}</option>`
+                ).join('');
+                
+                this.bookSelect.innerHTML = '<option value="">Select Book</option>' + options;
+                this.mobileBookSelect.innerHTML = '<option value="">Select Book</option>' + options;
+            }
+
+            populateBookNavigation() {
+                const oldTestament = this.books.filter(book => !book.id.startsWith('MAT'));
+                const newTestament = this.books.filter(book => book.id.startsWith('MAT'));
+                
+                let html = '';
+                
+                if (oldTestament.length > 0) {
+                    html += '<div class="mb-4"><h4 class="font-semibold text-sm text-gray-600 dark:text-gray-400 mb-2">Old Testament</h4>';
+                    oldTestament.forEach(book => {
+                        html += `<button class="book-nav-btn block w-full text-left px-2 py-1 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" data-book-id="${book.id}">${book.name}</button>`;
+                    });
+                    html += '</div>';
+                }
+                
+                if (newTestament.length > 0) {
+                    html += '<div><h4 class="font-semibold text-sm text-gray-600 dark:text-gray-400 mb-2">New Testament</h4>';
+                    newTestament.forEach(book => {
+                        html += `<button class="book-nav-btn block w-full text-left px-2 py-1 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" data-book-id="${book.id}">${book.name}</button>`;
+                    });
+                    html += '</div>';
+                }
+                
+                this.bookNavigation.innerHTML = html;
+                
+                // Add click listeners to book navigation buttons
+                this.bookNavigation.querySelectorAll('.book-nav-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const bookId = btn.getAttribute('data-book-id');
+                        this.bookSelect.value = bookId;
+                        this.mobileBookSelect.value = bookId;
+                        this.selectBook(bookId);
+                    });
+                });
+            }
+
+            async selectBook(bookId) {
+                if (!bookId || bookId === this.currentBook) return;
+                
+                this.currentBook = bookId;
+                this.currentChapter = null;
+                
+                this.chapterSelect.innerHTML = '<option value="">Loading...</option>';
+                this.mobileChapterSelect.innerHTML = '<option value="">Loading...</option>';
+                
+                try {
+                    const response = await this.apiCall(`bibles/${this.currentBible}/books/${bookId}/chapters`);
+                    this.chapters = response.data || [];
+                    
+                    this.populateChapters();
+                    
+                    // Auto-select first chapter
+                    if (this.chapters.length > 0) {
+                        this.selectChapter(this.chapters[0].id);
+                    }
+                } catch (error) {
+                    this.showError('Failed to load chapters. Please try again.');
+                }
+            }
+
+            populateChapters() {
+                const options = this.chapters.map(chapter => 
+                    `<option value="${chapter.id}">${chapter.number}</option>`
+                ).join('');
+                
+                this.chapterSelect.innerHTML = '<option value="">Ch.</option>' + options;
+                this.mobileChapterSelect.innerHTML = '<option value="">Select Chapter</option>' + options;
+            }
+
+            async selectChapter(chapterId) {
+                if (!chapterId || chapterId === this.currentChapter) return;
+                
+                this.currentChapter = chapterId;
+                this.chapterSelect.value = chapterId;
+                this.mobileChapterSelect.value = chapterId;
+                
+                this.loadChapter(this.currentBook, chapterId);
+            }
+
+            async loadChapter(bookId, chapterId) {
+                this.showLoading();
+                
+                try {
+                    const response = await this.apiCall(`bibles/${this.currentBible}/chapters/${chapterId}?content-type=text&include-notes=false&include-titles=true&include-chapter-numbers=false&include-verse-numbers=true`);
+                    
+                    if (response.data) {
+                        this.displayChapter(response.data);
+                        this.updateNavigation();
+                    } else {
+                        throw new Error('No chapter data received');
+                    }
+                } catch (error) {
+                    this.showError('Failed to load chapter content. Please try again.');
+                }
+            }
+
+            displayChapter(chapterData) {
+                const book = this.books.find(b => b.id === this.currentBook);
+                const chapter = this.chapters.find(c => c.id === this.currentChapter);
+                
+                this.chapterTitle.textContent = `${book.name} ${chapter.number}`;
+                this.chapterInfo.textContent = `${this.bibles.find(b => b.id === this.currentBible).name}`;
+                
+                // Process the content with improved verse formatting
+                let content = chapterData.content || '';
+                
+                // Enhanced verse number formatting with better separation
+                content = this.formatVerses(content);
+                
+                this.chapterText.innerHTML = content;
+                
+                this.hideLoading();
+                this.chapterHeader.classList.remove('hidden');
+                this.chapterText.classList.remove('hidden');
+                this.welcomeMessage.classList.add('hidden');
+                this.errorMessage.classList.add('hidden');
+                
+                // Scroll to top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            formatVerses(content) {
+                // Split content by verse patterns and format each verse properly
+                const versePattern = /(\[\s*\d+\s*\]|\d+)/g;
+                let formattedContent = '';
+                let lastIndex = 0;
+                
+                // Find all verse numbers and format them
+                const verses = content.split(versePattern).filter(part => part.trim() !== '');
+                
+                for (let i = 0; i < verses.length; i++) {
+                    const part = verses[i].trim();
+                    
+                    // Check if this part is a verse number
+                    if (/^\[\s*\d+\s*\]$/.test(part) || /^\d+$/.test(part)) {
+                        const verseNumber = part.replace(/[\[\]]/g, '').trim();
+                        const nextPart = verses[i + 1] ? verses[i + 1].trim() : '';
+                        
+                        if (nextPart) {
+                            formattedContent += `
+                                <div class="verse-container">
+                                    <span class="verse-number">${verseNumber}</span>
+                                    <span class="verse-text">${nextPart}</span>
+                                </div>
+                            `;
+                            i++; // Skip the next part since we've used it
+                        }
+                    } else if (i === 0) {
+                        // Handle content before first verse number
+                        formattedContent += `<div class="verse-container"><span class="verse-text">${part}</span></div>`;
+                    }
+                }
+                
+                // Fallback: if no verse patterns found, use original formatting
+                if (!formattedContent.trim()) {
+                    formattedContent = content.replace(/(\d+)/g, '<span class="verse-number">$1</span>');
+                }
+                
+                return formattedContent;
+            }
+
+            updateNavigation() {
+                const currentChapterIndex = this.chapters.findIndex(c => c.id === this.currentChapter);
+                
+                this.prevChapterBtn.disabled = currentChapterIndex <= 0;
+                this.nextChapterBtn.disabled = currentChapterIndex >= this.chapters.length - 1;
+            }
+
+            navigateChapter(direction) {
+                const currentChapterIndex = this.chapters.findIndex(c => c.id === this.currentChapter);
+                const newIndex = currentChapterIndex + direction;
+                
+                if (newIndex >= 0 && newIndex < this.chapters.length) {
+                    this.selectChapter(this.chapters[newIndex].id);
+                }
+            }
+
+            async performSearch() {
+                const query = this.searchInput.value.trim();
+                if (!query || !this.currentBible) return;
+                
+                this.searchResults.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-primary"></i><p class="mt-2">Searching...</p></div>';
+                
+                try {
+                    const response = await this.apiCall(`bibles/${this.currentBible}/search?query=${encodeURIComponent(query)}&limit=50`);
+                    
+                    if (response.data && response.data.verses && response.data.verses.length > 0) {
+                        this.displaySearchResults(response.data.verses);
+                    } else {
+                        this.searchResults.innerHTML = '<div class="text-center py-8 text-gray-500">No results found</div>';
+                    }
+                } catch (error) {
+                    this.searchResults.innerHTML = '<div class="text-center py-8 text-red-500">Search failed. Please try again.</div>';
+                }
+            }
+
+            displaySearchResults(verses) {
+                const html = verses.map(verse => `
+                    <div class="border-b border-gray-200 dark:border-gray-700 pb-4 mb-4 last:border-b-0">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-semibold text-primary">${verse.reference}</h4>
+                            <button class="text-sm text-gray-500 hover:text-primary" onclick="app.goToVerse('${verse.chapterId}')">
+                                Go to chapter
+                            </button>
+                        </div>
+                        <p class="text-gray-700 dark:text-gray-300">${verse.text}</p>
+                    </div>
+                `).join('');
+                
+                this.searchResults.innerHTML = html;
+            }
+
+            async goToVerse(chapterId) {
+                // Find the book that contains this chapter
+                for (const book of this.books) {
+                    try {
+                        const response = await this.apiCall(`bibles/${this.currentBible}/books/${book.id}/chapters`);
+                        const chapters = response.data || [];
+                        
+                        if (chapters.find(c => c.id === chapterId)) {
+                            this.bookSelect.value = book.id;
+                            this.mobileBookSelect.value = book.id;
+                            await this.selectBook(book.id);
+                            this.selectChapter(chapterId);
+                            this.searchModal.classList.add('hidden');
+                            break;
+                        }
+                    } catch (error) {
+                        console.error('Error finding chapter:', error);
+                    }
+                }
+            }
+
+            showLoading() {
+                this.loadingContent.classList.remove('hidden');
+                this.chapterText.classList.add('hidden');
+                this.errorMessage.classList.add('hidden');
+            }
+
+            hideLoading() {
+                this.loadingContent.classList.add('hidden');
+            }
+
+            showError(message) {
+                this.errorText.textContent = message;
+                this.errorMessage.classList.remove('hidden');
+                this.loadingContent.classList.add('hidden');
+                this.chapterText.classList.add('hidden');
+                this.welcomeMessage.classList.add('hidden');
+            }
+        }
+
+        // Initialize the app
+        const app = new BibleApp();
+    </script>
+
+
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SW registered: ', reg))
+            .catch(err => console.log('SW registration failed: ', err));
+        });
+      }
+    </script>
+  </body></html>

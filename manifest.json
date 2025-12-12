@@ -1,0 +1,22 @@
+{
+  "name": "Sacred Scripture Hub",
+  "short_name": "Scripture Hub",
+  "description": "Your comprehensive digital companion for daily Bible reading, study, and reflection. Access sacred texts offline, personalize your experience, and deepen your spiritual journey.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#E3F2FD",
+  "theme_color": "#1E88E5",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
